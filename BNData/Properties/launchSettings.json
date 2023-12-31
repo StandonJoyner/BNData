@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "BNData": {
+      "commandName": "Project",
+      "commandLineArgs": "update"
+    }
+  }
+}
