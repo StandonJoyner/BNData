@@ -6,16 +6,16 @@ DROP TABLE IF EXISTS spot_klines_1d;
 CREATE TABLE spot_klines_1d (
 	symbol TEXT NOT NULL,
 	open_time TIMESTAMP NOT NULL,
-	open   DECIMAL NOT NULL,
-	high   DECIMAL NOT NULL,
-	low    DECIMAL NOT NULL,
-	close  DECIMAL NOT NULL,
-	volume DECIMAL NOT NULL,
-	close_time TIMESTAMP NOT NULL,
-	quote_volume   DECIMAL NOT NULL,
-	trade_count    INTEGER NOT NULL,
-	buy_volume     DECIMAL NOT NULL,
-	buy_quote_volume DECIMAL NOT NULL
+	open   DECIMAL,
+	high   DECIMAL,
+	low    DECIMAL,
+	close  DECIMAL,
+	volume DECIMAL,
+	close_time TIMESTAMP,
+	quote_volume   DECIMAL,
+	trade_count    INTEGER,
+	buy_volume     DECIMAL,
+	buy_quote_volume DECIMAL
 );
 SELECT create_hypertable('spot_klines_1d', by_range('open_time'));
 CREATE INDEX ix_symbol_time ON spot_klines_1d (symbol, open_time DESC);

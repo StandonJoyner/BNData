@@ -64,6 +64,31 @@ namespace BNLib.DB
             }
         }
 
+        public async Task<List<BinanceSpotKline>> QueryKlinesAsync(string symbol, DateTime beg, DateTime end)
+        {
+            var sql = $"SELECT * from spot_klines_1d " +
+                $"WHERE symbol = '{symbol}' AND open_time >= '{beg}' AND open_time <= '{end}'" +
+                $"ORDER BY open_time ASC;";
+            var dataTable = await QueryDataAsync(sql);
+            var lines = new List<BinanceSpotKline>();
+            foreach (DataRow row in dataTable.Rows)
+            {
+                var line = new BinanceSpotKline();
+                line.OpenTime = row.Field<DateTime>("open_time");
+                line.OpenPrice = row.Field<decimal>("open");
+                line.HighPrice = row.Field<decimal>("high");
+                line.LowPrice = row.Field<decimal>("low");
+                line.ClosePrice = row.Field<decimal>("close");
+                line.Volume = row.Field<decimal>("volume");
+                line.CloseTime = row.Field<DateTime>("close_time");
+                line.QuoteVolume = row.Field<decimal>("quote_volume");
+                line.TradeCount = row.Field<int>("trade_count");
+                line.TakerBuyBaseVolume = row.Field<decimal>("buy_volume");
+                line.TakerBuyQuoteVolume = row.Field<decimal>("buy_quote_volume");
+                lines.Add(line);
+            }
+            return lines;
+        }
 
         public async Task InsertSpotTable(string symbol, List<BinanceSpotKline> data)
         {
@@ -90,6 +115,24 @@ namespace BNLib.DB
                     cmd.Parameters.AddWithValue("trade_count", kline.TradeCount);
                     cmd.Parameters.AddWithValue("buy_volume", kline.TakerBuyBaseVolume);
                     cmd.Parameters.AddWithValue("buy_quote_volume", kline.TakerBuyQuoteVolume);
+                    await cmd.ExecuteNonQueryAsync();
+                }
+            }
+        }
+
+        // 空数据插入
+        public async Task InsertSpotTableNullData(string symbol, List<BinanceSpotKline> data)
+        {
+            using (var conn = new NpgsqlConnection(_connString))
+            {
+                foreach (var kline in data)
+                {
+                    var cmd = new NpgsqlCommand("INSERT INTO spot_klines_1d" +
+                        "       (symbol, open_time)" +
+                        "VALUES(@symbol, @open_time)" 
+                        );
+                    cmd.Parameters.AddWithValue("symbol", symbol);
+                    cmd.Parameters.AddWithValue("open_time", kline.OpenTime);
                     await cmd.ExecuteNonQueryAsync();
                 }
             }

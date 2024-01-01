@@ -27,9 +27,15 @@ namespace BNLib.Frame
         public async Task UpdateKlinesAll(MarketType market, string symbol, KlineInterval inv)
         { 
             var tbegDate = new DateTime(2017, 8, 17, 0, 0, 0);
-            var lines = await GetLackKlines(market, symbol,inv, tbegDate, DateTime.Now);
+            var tendDate = DateTime.Today.AddDays(-1);
+            if (inv != KlineInterval.OneDay)
+                throw new Exception("Only support daily klines");
+            var lines = await GetLackKlines(market, symbol,inv, tbegDate, tendDate);
             var db = new PgDB();
+            db.Connect("postgres", "123456", "bndata");
             await db.InsertSpotTable(symbol, lines);
+            if (inv == KlineInterval.OneDay)
+                await FixDailyKlines(market, symbol, tbegDate, tendDate);
         }
 
         public async Task<List<BinanceSpotKline>> GetLackKlinesAll(MarketType market, string symbol, KlineInterval inv)
@@ -91,10 +97,9 @@ namespace BNLib.Frame
                 return lines;
             }
 
-            var firstMonthEnd = tbegDate.AddMonths(1); // next month
-            firstMonthEnd = LastMonthEndDay(firstMonthEnd);
-
-            var lastMonthBeg = new DateTime(tendDate.Year, tendDate.Month, 1, 0, 0, 0);
+            // 开始日期所在月的最后一天
+            var firstMonthEnd = LastMonthEndDay(tbegDate.AddMonths(1));
+            var lastMonthBeg = new DateTime(tendDate.Year, tendDate.Month, 1);
 
             if (tbegDate.Day > (31 - SMALL_DAY))
             {
@@ -172,6 +177,35 @@ namespace BNLib.Frame
             var lines = await KLineDownload.DownloadDailyKLines(market, symbol, inv, beg, end);
             lines = lines.Where(line => line.OpenTime >= beg && line.OpenTime <= end).ToList();
             return lines;
+        }
+        // 数据校准，自动补齐缺失的K线
+        public async Task FixDailyKlines(MarketType market, string symbol, DateTime tbegDate, DateTime tendDate)
+        {
+            var db = new PgDB();
+            db.Connect("postgres", "123456", "bndata");
+            var dblines = await db.QueryKlinesAsync(symbol, tbegDate, tendDate);
+            var lines = new List<BinanceSpotKline>();
+            var begDate = tbegDate;
+            foreach (var line in dblines)
+            {
+                while (line.OpenTime > begDate)
+                {
+                    var one = new BinanceSpotKline();
+                    one.OpenTime = begDate;
+                    lines.Add(line);
+                    begDate = begDate.AddDays(1);
+                }
+                begDate = line.OpenTime.AddDays(1);
+            }
+            while (begDate <= tendDate)
+            {
+                var one = new BinanceSpotKline();
+                one.OpenTime = begDate;
+                lines.Add(one);
+                begDate = begDate.AddDays(1);
+            }
+            if (lines.Count > 0)
+                await db.InsertSpotTableNullData(symbol, lines);
         }
     }
 }
