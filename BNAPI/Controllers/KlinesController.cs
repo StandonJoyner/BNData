@@ -4,27 +4,35 @@ using System.Data;
 using BNLib.DB;
 using Newtonsoft.Json;
 // For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
-using DictTable = System.Collections.Generic.Dictionary<string, System.Collections.Generic.List<object>>;
+using ListTable = System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<string, System.Collections.Generic.List<object>>>;
+using System.Text;
+using System.IO.Compression;
 
 namespace BNAPI.Controllers
 {
+    struct RequestStatus
+    {
+        public int    err_code;
+        public string err_msg;
+    }
     [Route("v1/BN/[controller]")]
     [ApiController]
     public class KlinesController : ControllerBase
     {
-        private DictTable Convert(DataTable dt)
+        private ListTable Convert(DataTable dt)
         {
-            var dict = new DictTable();
+            var dict = new ListTable(dt.Columns.Count);
+            int i = 0;
             foreach (DataColumn column in dt.Columns)
             {
-                dict[column.ColumnName] = new List<object>();
-            }
-            foreach (DataRow row in dt.Rows)
-            {
-                foreach (DataColumn column in dt.Columns)
+                // List效率高，而且可以保持顺序
+                var col = new List<object>(dt.Rows.Count);
+                foreach (DataRow row in dt.Rows)
                 {
-                    dict[column.ColumnName].Add(row[column]);
+                    col.Add(row[column]);
                 }
+                dict.Add(new KeyValuePair<string, List<object>>(column.ColumnName, col));
+                i++;
             }
             return dict;
         }
@@ -32,7 +40,7 @@ namespace BNAPI.Controllers
         public async Task<IActionResult> GetDS(string symbols, string indis, string tbeg, string tend, string? ext = null)
         {
             var symbol = symbols.Split(',');
-            var indi = indis.Split(',');
+            var indiAry = indis.Split(',');
             if (!DateTime.TryParse(tbeg, out DateTime tbegDate))
             {
                 return BadRequest("Invalid tbeg parameter");
@@ -41,28 +49,42 @@ namespace BNAPI.Controllers
             {
                 return BadRequest("Invalid tend parameter");
             }
-            var dict = new Dictionary<string, DictTable>();
+            var columns = GetSQLColumns(indiAry, tbegDate, tendDate, ext);
+
+            var dict = new List<KeyValuePair<string, ListTable>>(symbol.Length);
             foreach (var s in symbol)
             {
-                var ds = await GetDSPiece(s, indi, tbegDate, tendDate, ext);
-                dict[s] = ds;
+                var ds = await GetDSOne(s, columns, tbegDate, tendDate);
+                dict.Add(new KeyValuePair<string, ListTable>(s, ds));
             }
-            return Ok(JsonConvert.SerializeObject(dict));
-        }
+            var result = new Dictionary<string, object>();
+            result["data"] = dict;
+            result["status"] = new RequestStatus { err_code = 0, err_msg = "OK" };
 
-        private async Task<DictTable> GetDSPiece(string symbol, string[] indis, DateTime tbeg, DateTime tend, string? ext)
-        {
-            var columns = GetSQLColumns(indis, tbeg, tend, ext);
-            return await GetDSOne(symbol, columns, tbeg, tend);
+            var json = JsonConvert.SerializeObject(result);
+            return Ok(json);
         }
 
         private string GetSQLColumns(string[] indis, DateTime tbeg, DateTime tend, string? ext)
         {
-            string sql="open_time, open";
-            return sql;
+            string[] legals= {"open", "high", "low", "close", "volume"};
+            foreach (var i in indis)
+            {
+                if (!legals.Contains(i))
+                {
+                    throw new ArgumentException($"Invalid indicator {i}");
+                }
+            }
+            StringBuilder sql = new StringBuilder();
+            sql.Append("open_time");
+            foreach (var i in indis)
+            {
+                sql.Append($", {i}");
+            }
+            return sql.ToString();
         }
 
-        private async Task<DictTable> GetDSOne(string symbol, string columns, DateTime tbeg, DateTime tend)
+        private async Task<ListTable> GetDSOne(string symbol, string columns, DateTime tbeg, DateTime tend)
         {
             var sql = $"SELECT {columns} FROM spot_klines_1d " +
                 $"WHERE symbol='{symbol}' AND" +

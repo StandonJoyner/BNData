@@ -186,6 +186,9 @@ namespace BNLib.Frame
             var dblines = await db.QueryKlinesAsync(symbol, tbegDate, tendDate);
             var lines = new List<BinanceSpotKline>();
             var begDate = tbegDate;
+            // 去掉开始日期前的数据
+            if (dblines.Count > 0 && dblines[0].OpenTime > tbegDate)
+                begDate = dblines[0].OpenTime;
             foreach (var line in dblines)
             {
                 while (line.OpenTime > begDate)
@@ -204,8 +207,12 @@ namespace BNLib.Frame
                 lines.Add(one);
                 begDate = begDate.AddDays(1);
             }
-            if (lines.Count > 0)
-                await db.InsertSpotTableNullData(symbol, lines);
+            foreach (var line in lines)
+            {
+                Console.WriteLine($"缺失 {symbol}, {line.OpenTime}");
+            }
+            //if (lines.Count > 0)
+            //    await db.InsertSpotTableNullData(symbol, lines);
         }
     }
 }
