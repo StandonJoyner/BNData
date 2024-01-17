@@ -66,8 +66,10 @@ namespace BNLib.DB
 
         public async Task<List<BinanceSpotKline>> QueryKlinesAsync(string symbol, DateTime beg, DateTime end)
         {
+            string begStr = beg.ToString("yyyy-MM-dd");
+            string endStr = end.ToString("yyyy-MM-dd");
             var sql = $"SELECT * from spot_klines_1d " +
-                $"WHERE symbol = '{symbol}' AND open_time >= '{beg}' AND open_time <= '{end}'" +
+                $"WHERE symbol = '{symbol}' AND open_time >= '{begStr}' AND open_time <= '{endStr}'" +
                 $"ORDER BY open_time ASC;";
             var dataTable = await QueryDataAsync(sql);
             var lines = new List<BinanceSpotKline>();

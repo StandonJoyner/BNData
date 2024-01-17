@@ -54,7 +54,12 @@ namespace BNAPI.Controllers
             var dict = new List<KeyValuePair<string, ListTable>>(symbol.Length);
             foreach (var s in symbol)
             {
-                var ds = await GetDSOne(s, columns, tbegDate, tendDate);
+                var assets = s.Split('/');
+                if (assets.Length != 2)
+                {
+                    return BadRequest("Invalid symbol parameter");
+                }
+                var ds = await GetDSOne(assets[0] + assets[1], columns, tbegDate, tendDate);
                 dict.Add(new KeyValuePair<string, ListTable>(s, ds));
             }
             var result = new Dictionary<string, object>();
@@ -86,9 +91,11 @@ namespace BNAPI.Controllers
 
         private async Task<ListTable> GetDSOne(string symbol, string columns, DateTime tbeg, DateTime tend)
         {
+            string strBegin = tbeg.ToString("yyyy-MM-dd");
+            string strEnd = tend.ToString("yyyy-MM-dd");
             var sql = $"SELECT {columns} FROM spot_klines_1d " +
                 $"WHERE symbol='{symbol}' AND" +
-                $"      open_time >= '{tbeg}' and open_time <= '{tend}'" +
+                $"      open_time >= '{strBegin}' and open_time <= '{strEnd}'" +
                 $";";
             var db = new PgDB();
             var table = await db.QueryDataAsync(sql);
