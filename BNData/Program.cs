@@ -37,20 +37,6 @@ namespace BNData
                     errs => 1
                 );
         }
-        static int RunInit(InitOptions opts)
-        {
-            if (opts.Verbose)
-            {
-                Console.WriteLine("Verbose selected");
-            }
-            Console.WriteLine("RunInitAndReturnExitCode");
-            return 0;
-        }
-        static int RunAdd(AddOptions opts)
-        {
-            Console.WriteLine("RunAddAndReturnExitCode");
-            return 0;
-        }
 
         void test2()
         {
