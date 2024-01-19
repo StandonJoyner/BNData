@@ -31,8 +31,10 @@ namespace BNLib.DB
                 var assembly = Assembly.GetExecutingAssembly();
                 var resourceName = assembly.GetManifestResourceNames()
                     .Single(str => str.EndsWith("Resources.init.sql"));
-                using (Stream stream = assembly.GetManifestResourceStream(resourceName))
+                using (Stream? stream = assembly.GetManifestResourceStream(resourceName))
                 {
+                    if (stream == null)
+                        throw new Exception("Cannot find init.sql");
                     StreamReader reader = new StreamReader(stream);
                     string result = reader.ReadToEnd();
 

@@ -24,13 +24,13 @@ namespace BNLib.BN
             {
                 Console.WriteLine(ex.Message);
             }
-            return null;
+            return [];
         }
 
         public static async Task<string[]> ParseZip(byte[] data)
         {
             if (data == null)
-                return null;
+                return [];
             var ms = new System.IO.MemoryStream(data);
             var zip = new System.IO.Compression.ZipArchive(ms);
             foreach (var entry in zip.Entries)
@@ -42,7 +42,7 @@ namespace BNLib.BN
                     return lines.Split('\n');
                 }
             }
-            return null;
+            return [];
         }
 
         public static List<BinanceSpotKline> ParseKlinesCSV(string[] lines)

@@ -19,7 +19,7 @@ namespace BNLib.BN
             if (type == MarketType.SPOT)
                 return await GetSpotExchangeInfo();
             else
-                return null;
+                return new BinanceExchangeInfo();
         }
 
         public static async Task<BinanceExchangeInfo> GetSpotExchangeInfo()
@@ -53,7 +53,10 @@ namespace BNLib.BN
             else
             {
                 var info = await GetExchangeInfo(type);
-                return info.Symbols.FirstOrDefault(s => s.Name == symbol);
+                var s = info.Symbols.FirstOrDefault(s => s.Name == symbol);
+                if (s == null)
+                    return new BinanceSymbol();
+                return s;
             }
         }
 
@@ -64,6 +67,8 @@ namespace BNLib.BN
 
             var info = await GetExchangeInfo(MarketType.SPOT);
             var s = info.Symbols.FirstOrDefault(s => s.Name == symbol);
+            if (s == null)
+                return new BinanceSymbol();
             _symbolSpotCache.Add(symbol, s, _cachePolicy);
             return s;
         }

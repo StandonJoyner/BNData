@@ -16,19 +16,19 @@ namespace BNData.Options
     internal class UpdateOptions
     {
         [Option('s', "symbols", Required = false, HelpText = "Coin symbols")]
-        public string _symbol { get; set; }
+        public string? _symbol { get; set; }
 
         [Option('i', "input", Required = false, HelpText = "Input symbol file")]
-        public string _inputfile { get; set; }
+        public string? _inputfile { get; set; }
 
         [Option('b', "begdate", Required = false, HelpText = "Begin date")]
-        public string _begdate { get; set; }
+        public string? _begdate { get; set; }
 
         [Option('e', "enddate", Required = false, HelpText = "End date")]
-        public string _enddate { get; set; }
+        public string? _enddate { get; set; }
 
         [Option('o', "output", Required = false, HelpText = "Output file name")]
-        public string _output { get; set; }
+        public string? _output { get; set; }
 
         public int Run()
         {
