@@ -81,7 +81,7 @@ namespace BNAPI.Controllers
                 }
             }
             StringBuilder sql = new StringBuilder();
-            sql.Append("open_time");
+            sql.Append("date");
             foreach (var i in indis)
             {
                 sql.Append($", {i}");
@@ -95,7 +95,7 @@ namespace BNAPI.Controllers
             string strEnd = tend.ToString("yyyy-MM-dd");
             var sql = $"SELECT {columns} FROM spot_klines_1d " +
                 $"WHERE symbol='{symbol}' AND" +
-                $"      open_time >= '{strBegin}' and open_time <= '{strEnd}'" +
+                $"      date >= '{strBegin}' and date <= '{strEnd}'" +
                 $";";
             var db = new PgDB();
             var table = await db.QueryDataAsync(sql);

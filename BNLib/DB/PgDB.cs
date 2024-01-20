@@ -73,14 +73,14 @@ namespace BNLib.DB
             string begStr = beg.ToString("yyyy-MM-dd");
             string endStr = end.ToString("yyyy-MM-dd");
             var sql = $"SELECT * from spot_klines_1d " +
-                $"WHERE symbol = '{symbol}' AND open_time >= '{begStr}' AND open_time <= '{endStr}'" +
-                $"ORDER BY open_time ASC;";
+                $"WHERE symbol = '{symbol}' AND date >= '{begStr}' AND date <= '{endStr}'" +
+                $"ORDER BY date ASC;";
             var dataTable = await QueryDataAsync(sql);
             var lines = new List<BinanceSpotKline>();
             foreach (DataRow row in dataTable.Rows)
             {
                 var line = new BinanceSpotKline();
-                line.OpenTime = row.Field<DateTime>("open_time");
+                line.OpenTime = row.Field<DateTime>("date");
                 line.OpenPrice = row.Field<decimal>("open");
                 line.HighPrice = row.Field<decimal>("high");
                 line.LowPrice = row.Field<decimal>("low");
@@ -103,14 +103,14 @@ namespace BNLib.DB
                 foreach (var kline in data)
                 {
                     var cmd = new NpgsqlCommand("INSERT INTO spot_klines_1d (" +
-                                        "       symbol, open_time, open, high, low, close, volume," +
+                                        "       symbol, date, open, high, low, close, volume," +
                                         "       close_time, quote_volume, trade_count, buy_volume, buy_quote_volume" +
                                         "       )" +
-                                        "VALUES(@symbol, @open_time, @open, @high, @low, @close, @volume," +
+                                        "VALUES(@symbol, @date, @open, @high, @low, @close, @volume," +
                                         "       @close_time, @quote_volume, @trade_count, @buy_volume, @buy_quote_volume" +
                                         ");", conn);
                     cmd.Parameters.AddWithValue("symbol", symbol);
-                    cmd.Parameters.AddWithValue("open_time", kline.OpenTime);
+                    cmd.Parameters.AddWithValue("date", kline.OpenTime);
                     cmd.Parameters.AddWithValue("open", kline.OpenPrice);
                     cmd.Parameters.AddWithValue("high", kline.HighPrice);
                     cmd.Parameters.AddWithValue("low", kline.LowPrice);
@@ -134,11 +134,11 @@ namespace BNLib.DB
                 foreach (var kline in data)
                 {
                     var cmd = new NpgsqlCommand("INSERT INTO spot_klines_1d" +
-                        "       (symbol, open_time)" +
-                        "VALUES(@symbol, @open_time)" 
+                        "       (symbol, date)" +
+                        "VALUES(@symbol, @date)" 
                         );
                     cmd.Parameters.AddWithValue("symbol", symbol);
-                    cmd.Parameters.AddWithValue("open_time", kline.OpenTime);
+                    cmd.Parameters.AddWithValue("date", kline.OpenTime);
                     await cmd.ExecuteNonQueryAsync();
                 }
             }
@@ -148,7 +148,7 @@ namespace BNLib.DB
         {
             using (var conn = new NpgsqlConnection(_connString))
             {
-                var cmd = new NpgsqlCommand("SELECT MIN(open_time), MAX(open_time) FROM spot_klines_1d " +
+                var cmd = new NpgsqlCommand("SELECT MIN(date), MAX(date) FROM spot_klines_1d " +
                 "WHERE symbol = @symbol HAVING COUNT(*) > 0;", conn);
                 cmd.Parameters.AddWithValue("symbol", sym);
                 var reader = await cmd.ExecuteReaderAsync();
