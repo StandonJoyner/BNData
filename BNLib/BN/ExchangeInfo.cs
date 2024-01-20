@@ -14,12 +14,12 @@ namespace BNLib.BN
         private static AsyncLock _spotLock = new AsyncLock();
         private static CacheItemPolicy _cachePolicy = new CacheItemPolicy { AbsoluteExpiration = DateTime.Today.AddDays(1) };
 
-        public static async Task<BinanceExchangeInfo> GetExchangeInfo(MarketType type)
+        public static async Task<BinanceExchangeInfo?> GetExchangeInfo(MarketType type)
         {
             if (type == MarketType.SPOT)
                 return await GetSpotExchangeInfo();
             else
-                return new BinanceExchangeInfo();
+                return null;
         }
 
         public static async Task<BinanceExchangeInfo> GetSpotExchangeInfo()
@@ -38,13 +38,17 @@ namespace BNLib.BN
         public static async Task<IEnumerable<string>> GetAllSymbols(MarketType type, bool tradingOnly)
         {
             var info = await GetExchangeInfo(type);
+            if (info == null)
+            {
+                return new List<string>();
+            }
             if (tradingOnly)
                 return info.Symbols.Where(s => s.Status == SymbolStatus.Trading).Select(s => s.Name);
             else
                 return info.Symbols.Select(s => s.Name);
         }
 
-        public static async Task<BinanceSymbol> GetSymbol(MarketType type, string symbol)
+        public static async Task<BinanceSymbol?> GetSymbol(MarketType type, string symbol)
         {
             if (type == MarketType.SPOT)
             {
@@ -53,19 +57,21 @@ namespace BNLib.BN
             else
             {
                 var info = await GetExchangeInfo(type);
+                if (info == null)
+                    return null;
                 var s = info.Symbols.FirstOrDefault(s => s.Name == symbol);
-                if (s == null)
-                    return new BinanceSymbol();
                 return s;
             }
         }
 
-        public static async Task<BinanceSymbol> GetSpotSymbols(string symbol)
+        public static async Task<BinanceSymbol?> GetSpotSymbols(string symbol)
         {
             if (_symbolSpotCache.Contains(symbol))
                 return (BinanceSymbol)_symbolSpotCache.Get(symbol);
 
             var info = await GetExchangeInfo(MarketType.SPOT);
+            if (info == null)
+                return null;
             var s = info.Symbols.FirstOrDefault(s => s.Name == symbol);
             if (s == null)
                 return new BinanceSymbol();
