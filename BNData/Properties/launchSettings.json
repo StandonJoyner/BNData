@@ -2,7 +2,7 @@
   "profiles": {
     "BNData": {
       "commandName": "Project",
-      "commandLineArgs": "update"
+      "commandLineArgs": "init"
     }
   }
 }

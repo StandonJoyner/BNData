@@ -24,18 +24,17 @@ namespace BNLib.Frame
             return result.AddMilliseconds(-1);
         }
 
-        public async Task UpdateKlinesAll(MarketType market, string symbol, KlineInterval inv)
+        public async Task UpdateKlinesAll(PgDB db, MarketType market, string symbol, KlineInterval inv)
         { 
             var tbegDate = new DateTime(2017, 8, 17, 0, 0, 0);
             var tendDate = DateTime.Today.AddDays(-1);
             if (inv != KlineInterval.OneDay)
                 throw new Exception("Only support daily klines");
             var lines = await GetLackKlines(market, symbol,inv, tbegDate, tendDate);
-            var db = new PgDB();
-            db.Connect("postgres", "123456", "bndata");
+
             await db.InsertSpotTable(symbol, lines);
             if (inv == KlineInterval.OneDay)
-                await FixDailyKlines(market, symbol, tbegDate, tendDate);
+                await FixDailyKlines(db, market, symbol, tbegDate, tendDate);
         }
 
         public async Task<List<BinanceSpotKline>> GetLackKlinesAll(MarketType market, string symbol, KlineInterval inv)
@@ -179,10 +178,8 @@ namespace BNLib.Frame
             return lines;
         }
         // 数据校准，自动补齐缺失的K线
-        public async Task FixDailyKlines(MarketType market, string symbol, DateTime tbegDate, DateTime tendDate)
+        public async Task FixDailyKlines(PgDB db, MarketType market, string symbol, DateTime tbegDate, DateTime tendDate)
         {
-            var db = new PgDB();
-            db.Connect("postgres", "123456", "bndata");
             var dblines = await db.QueryKlinesAsync(symbol, tbegDate, tendDate);
             var lines = new List<BinanceSpotKline>();
             var begDate = tbegDate;

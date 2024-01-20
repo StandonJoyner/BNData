@@ -22,12 +22,14 @@ namespace BNLib.DB
         {
         }
 
-        public async Task InitDB(string admin, string passwd, string db)
+        public async Task InitDB(string host, string port, string user, string passwd, string db)
         {
-            Connect(admin, passwd, db);
+            Connect(host, port, user, passwd, db);
 
             using (var conn = new NpgsqlConnection(_connString))
             {
+                await conn.OpenAsync();
+
                 var assembly = Assembly.GetExecutingAssembly();
                 var resourceName = assembly.GetManifestResourceNames()
                     .Single(str => str.EndsWith("Resources.init.sql"));
@@ -44,9 +46,9 @@ namespace BNLib.DB
             }
         }
 
-        public void Connect(string user, string passwd, string db)
+        public void Connect(string host, string port, string user, string passwd, string db)
         {
-            _connString = $"Host=localhost;Username={user};Password={passwd};DataBase={db}";
+            _connString = $"Host={host};Port={port};Username={user};Password={passwd};DataBase={db}";
         }
 
         public async Task<DataTable> QueryDataAsync(string sql)

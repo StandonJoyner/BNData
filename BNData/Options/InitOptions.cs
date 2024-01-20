@@ -8,6 +8,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using BNLib.DB;
+using System.Configuration;
 
 namespace BNData.Options
 {
@@ -24,8 +25,19 @@ namespace BNData.Options
         }
         void testInit()
         {
+            string? host = ConfigurationManager.AppSettings["dbhost"];
+            string? port = ConfigurationManager.AppSettings["dbport"];
+            string? user = ConfigurationManager.AppSettings["dbuser"];
+            string? passwd = ConfigurationManager.AppSettings["dbpasswd"];
+            if (host == null || port == null || user == null || passwd == null)
+                throw new Exception("Cannot find db config");
+
+            // 要先创建数据库: CREATE DATABASE bndata;
+            // 允许远程连接
+            // 修改密码 ALTER USER postgres WITH PASSWORD '123456';
+            // 启用timescaledb
             PgDB db = new PgDB();
-            db.InitDB("postgres", "123456", "bndata")
+            db.InitDB(host, port, user, passwd, "bndata")
                 .Wait();
         }
     }
