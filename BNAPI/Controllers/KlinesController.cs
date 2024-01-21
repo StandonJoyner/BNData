@@ -7,6 +7,7 @@ using Newtonsoft.Json;
 using ListTable = System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<string, System.Collections.Generic.List<object>>>;
 using System.Text;
 using System.IO.Compression;
+using BNAPI.Common;
 
 namespace BNAPI.Controllers
 {
@@ -19,6 +20,11 @@ namespace BNAPI.Controllers
     [ApiController]
     public class KlinesController : ControllerBase
     {
+        private readonly ILogger<KlinesController> _logger;
+        public KlinesController(ILogger<KlinesController> logger)
+        {
+            _logger = logger;
+        }
         private ListTable Convert(DataTable dt)
         {
             var dict = new ListTable(dt.Columns.Count);
@@ -39,6 +45,7 @@ namespace BNAPI.Controllers
         [HttpGet("dateseries")]
         public async Task<IActionResult> GetDS(string symbols, string indis, string tbeg, string tend, string? ext = null)
         {
+            _logger.LogInformation($"GetDS {symbols} {indis} {tbeg} {tend} {ext}");
             var symbol = symbols.Split(',');
             var indiAry = indis.Split(',');
             if (!DateTime.TryParse(tbeg, out DateTime tbegDate))
@@ -51,6 +58,7 @@ namespace BNAPI.Controllers
             }
             var columns = GetSQLColumns(indiAry, tbegDate, tendDate, ext);
 
+            int cells = 0;
             var dict = new List<KeyValuePair<string, ListTable>>(symbol.Length);
             foreach (var s in symbol)
             {
@@ -60,8 +68,10 @@ namespace BNAPI.Controllers
                     return BadRequest("Invalid symbol parameter");
                 }
                 var ds = await GetDSOne(assets[0] + assets[1], columns, tbegDate, tendDate);
+                cells += ds[0].Value.Count;
                 dict.Add(new KeyValuePair<string, ListTable>(s, ds));
             }
+            _logger.LogInformation($"GetDS cells {cells}");
             var result = new Dictionary<string, object>();
             result["data"] = dict;
             result["status"] = new RequestStatus { err_code = 0, err_msg = "OK" };
@@ -97,9 +107,21 @@ namespace BNAPI.Controllers
                 $"WHERE symbol='{symbol}' AND" +
                 $"      date >= '{strBegin}' and date <= '{strEnd}'" +
                 $";";
-            var db = new PgDB();
+            var db = GetDB();
             var table = await db.QueryDataAsync(sql);
             return Convert(table);
+        }
+
+        PgDB GetDB()
+        {
+            // 要先创建数据库: CREATE DATABASE bndata;
+            PgDB db = new PgDB();
+            db.Connect(DBConfig.Instance.Host,
+                DBConfig.Instance.Port,
+                DBConfig.Instance.User,
+                DBConfig.Instance.Password,
+                DBConfig.Instance.DB);
+            return db;
         }
     }
 }

@@ -5,15 +5,14 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
-
   <ItemGroup>
     <PackageReference Include="Npgsql" Version="8.0.1" />
+    <PackageReference Include="Serilog" Version="3.1.1" />
+    <PackageReference Include="Serilog.AspNetCore" Version="8.0.1" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.5.0" />
+    <PackageReference Include="log4net" Version="2.0.15" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\BNLib\BNLib.csproj" />
-  </ItemGroup>
-  <ItemGroup>
-    <Folder Include="DB\" />
   </ItemGroup>
 </Project>
