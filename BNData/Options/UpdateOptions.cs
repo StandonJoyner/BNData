@@ -4,6 +4,7 @@ using BNLib.DB;
 using BNLib.Enums;
 using BNLib.Frame;
 using CommandLine;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Configuration;
@@ -16,6 +17,8 @@ namespace BNData.Options
     [Verb("update", HelpText = "Update database.")]
     internal class UpdateOptions
     {
+        private static readonly ILogger Log = Serilog.Log.ForContext<UpdateOptions>();
+
         [Option('s', "symbols", Required = false, HelpText = "Coin symbols")]
         public string? _symbol { get; set; }
 
@@ -76,6 +79,7 @@ namespace BNData.Options
             var syms = await ExchangeInfo.GetAllSymbols(MarketType.SPOT, true);
             foreach (var s in syms)
             {
+                Log.Information($"Update {s}");
                 await up.UpdateKlinesAll(db, MarketType.SPOT, s, KlineInterval.OneDay);
             }
             return 0;

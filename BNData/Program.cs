@@ -1,21 +1,17 @@
 ﻿// See https://aka.ms/new-console-template for more information
 
 using Binance.Net.Enums;
-using BNLib.DB;
 using BNLib.Frame;
 using BNLib.Enums;
-using BNLib.BN;
 using log4net;
 using CommandLine;
 using BNData.Options;
-using System.Security.Cryptography.X509Certificates;
+using Serilog;
 
 namespace BNData
 {
     class Program
     {
-        static ILog _log = LogManager.GetLogger("BNData");
-
         [Verb("add", HelpText = "Add file contents to the index.")]
         class AddOptions
         {
@@ -30,6 +26,10 @@ namespace BNData
 
         static void Main(string[] args)
         {
+            Log.Logger = new LoggerConfiguration()
+                .WriteTo.File("logs/myapp.txt", rollingInterval: RollingInterval.Day)
+                .CreateLogger();
+
             Parser.Default.ParseArguments<InitOptions, UpdateOptions>(args)
                 .MapResult(
                     (InitOptions opts) => opts.Run(),
