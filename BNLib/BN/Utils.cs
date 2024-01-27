@@ -60,15 +60,17 @@ namespace BNLib.BN
                     continue;
                 var items = line.Split(',');
                 var data = new BinanceSpotKline();
-                DateTimeOffset dateTimeOffset = DateTimeOffset.FromUnixTimeMilliseconds(long.Parse(items[0]));
-                data.OpenTime = dateTimeOffset.DateTime;
+                long unixTm0 = long.Parse(items[0]);
+                DateTimeOffset dateTimeOffset = DateTimeOffset.FromUnixTimeMilliseconds(unixTm0);
+                data.OpenTime = DateTime.SpecifyKind(dateTimeOffset.DateTime, DateTimeKind.Utc);
+
                 data.OpenPrice = decimal.Parse(items[1]);
                 data.HighPrice = decimal.Parse(items[2]);
                 data.LowPrice = decimal.Parse(items[3]);
                 data.ClosePrice = decimal.Parse(items[4]);
                 data.Volume = decimal.Parse(items[5]);
                 dateTimeOffset = DateTimeOffset.FromUnixTimeMilliseconds(long.Parse(items[6]));
-                data.CloseTime = dateTimeOffset.DateTime;
+                data.CloseTime = DateTime.SpecifyKind(dateTimeOffset.DateTime, DateTimeKind.Utc);
                 data.QuoteVolume = decimal.Parse(items[7]);
                 data.TradeCount = int.Parse(items[8]);
                 data.TakerBuyBaseVolume = decimal.Parse(items[9]);

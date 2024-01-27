@@ -5,7 +5,7 @@ DROP TABLE IF EXISTS spot_klines_1d;
 
 CREATE TABLE spot_klines_1d (
 	symbol TEXT NOT NULL,
-	date   TIMESTAMP NOT NULL,
+	open_time   TIMESTAMP NOT NULL,
 	open   DECIMAL,
 	high   DECIMAL,
 	low    DECIMAL,
@@ -17,8 +17,8 @@ CREATE TABLE spot_klines_1d (
 	buy_volume     DECIMAL,
 	buy_quote_volume DECIMAL
 );
-SELECT create_hypertable('spot_klines_1d', by_range('date'));
-CREATE INDEX ix_symbol_time ON spot_klines_1d (symbol, date DESC);
+SELECT create_hypertable('spot_klines_1d', by_range('open_time'));
+CREATE INDEX ix_symbol_time ON spot_klines_1d (symbol, open_time DESC);
 
 CREATE TABLE request_logs (
 	ip    TEXT NOT NULL,

@@ -67,7 +67,10 @@ namespace BNData.Options
                 // read lines
                 string symbol = fs.Name.Split('\\').Last().Split('.').First();
                 TextReader tr = new StreamReader(fs);
-                string[] lines = tr.ReadToEnd().Split('\n');
+                string strContent = tr.ReadToEnd();
+                if (strContent.Length == 0)
+                    return 0;
+                string[] lines = strContent.Split('\n');
                 if (lines.Length == 0)
                     return 0;
 

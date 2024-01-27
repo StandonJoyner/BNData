@@ -76,7 +76,7 @@ namespace BNData.Options
             // make dir to save klines
             DateTime now = DateTime.Now;
             string outputDir = "klines";
-            outputDir = Path.Combine(outputDir, now.ToString("yyyyMMdd_hh:mm"));
+            outputDir = Path.Combine(outputDir, now.ToString("yyyyMMdd_hh_mm"));
 
             if (!Directory.Exists(outputDir))
                 Directory.CreateDirectory(outputDir);

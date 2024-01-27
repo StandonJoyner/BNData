@@ -54,7 +54,7 @@ namespace BNLib.DB
         public void Connect(string host, string port, string user, string passwd, string db)
         {
             _connString = $"Host={host};Port={port};Username={user};Password={passwd};DataBase={db};" +
-                $"Pooling=true";
+                $"CommandTimeout=300";
         }
 
         public async Task<DataTable> QueryDataAsync(string sql)
@@ -79,14 +79,14 @@ namespace BNLib.DB
             string begStr = beg.ToString("yyyy-MM-dd");
             string endStr = end.ToString("yyyy-MM-dd");
             var sql = $"SELECT * from spot_klines_1d " +
-                $"WHERE symbol = '{symbol}' AND date >= '{begStr}' AND date <= '{endStr}'" +
-                $"ORDER BY date ASC;";
+                $"WHERE symbol = '{symbol}' AND open_time >= '{begStr}' AND open_time <= '{endStr}'" +
+                $"ORDER BY open_time ASC;";
             var dataTable = await QueryDataAsync(sql);
             var lines = new List<BinanceSpotKline>();
             foreach (DataRow row in dataTable.Rows)
             {
                 var line = new BinanceSpotKline();
-                line.OpenTime = row.Field<DateTime>("date");
+                line.OpenTime = row.Field<DateTime>("open_time");
                 line.OpenPrice = row.Field<decimal>("open");
                 line.HighPrice = row.Field<decimal>("high");
                 line.LowPrice = row.Field<decimal>("low");
@@ -124,31 +124,27 @@ namespace BNLib.DB
             {
                 await conn.OpenAsync();
 
-                List<spot_klines_1d> klines = new List<spot_klines_1d>();
-                foreach (var kline in data)
+                using (var writer = conn.BeginBinaryImport("COPY spot_klines_1d (" +
+                                    "       symbol, open_time, open, high, low, close, volume," +
+                                    "       close_time, quote_volume, trade_count, buy_volume, buy_quote_volume" +
+                    ") FROM STDIN (FORMAT BINARY)"))
                 {
-                    klines.Add(new spot_klines_1d
+                    foreach (var item in data)
                     {
-                        symbol = symbol,
-                        date = kline.OpenTime,
-                        open = kline.OpenPrice,
-                        high = kline.HighPrice,
-                        low = kline.LowPrice,
-                        close = kline.ClosePrice,
-                        volume = kline.Volume,
-                        close_time = kline.CloseTime,
-                        quote_volume = kline.QuoteVolume,
-                        trade_count = kline.TradeCount,
-                        buy_volume = kline.TakerBuyBaseVolume,
-                        buy_quote_volume = kline.TakerBuyQuoteVolume
-                    });
-                }
-                var optionsBuilder = new DbContextOptionsBuilder<DbContext>();
-                optionsBuilder.UseNpgsql(conn);
-                using (var context = new DbContext(optionsBuilder.Options))
-                {
-                    var uploader = new NpgsqlBulkUploader(context);
-                    uploader.Insert(klines);
+                        writer.StartRow();
+                        writer.Write(symbol);
+                        writer.Write(item.OpenTime);
+                        writer.Write(item.OpenPrice);
+                        writer.Write(item.HighPrice);
+                        writer.Write(item.LowPrice);
+                        writer.Write(item.ClosePrice);
+                        writer.Write(item.Volume);
+                        writer.Write(item.CloseTime);
+                        writer.Write(item.QuoteVolume);
+                        writer.Write(item.TradeCount);
+                        writer.Write(item.TakerBuyBaseVolume);
+                        writer.Write(item.TakerBuyQuoteVolume);
+                    }
                 }
             }
         }
@@ -190,7 +186,7 @@ namespace BNLib.DB
                     }
                 }
 
-                var cmd = new NpgsqlCommand("SELECT MIN(date), MAX(date) FROM spot_klines_1d " +
+                var cmd = new NpgsqlCommand("SELECT MIN(open_time), MAX(open_time) FROM spot_klines_1d " +
 "WHERE symbol = @symbol HAVING COUNT(*) > 0;", conn);
                 cmd.Parameters.AddWithValue("symbol", sym);
 
