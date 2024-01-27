@@ -91,7 +91,7 @@ namespace BNAPI.Controllers
                 }
             }
             StringBuilder sql = new StringBuilder();
-            sql.Append("date");
+            sql.Append("open_time");
             foreach (var i in indis)
             {
                 sql.Append($", {i}");

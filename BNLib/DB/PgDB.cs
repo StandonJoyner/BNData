@@ -118,34 +118,44 @@ namespace BNLib.DB
             public decimal buy_quote_volume { get; set; }
         }
 
-        public async Task InsertSpotTable(string symbol, List<BinanceSpotKline> data)
+        public async Task<bool> InsertSpotTable(string symbol, List<BinanceSpotKline> data)
         {
-            using (var conn = new NpgsqlConnection(_connString))
+            try
             {
-                await conn.OpenAsync();
-
-                using (var writer = conn.BeginBinaryImport("COPY spot_klines_1d (" +
-                                    "       symbol, open_time, open, high, low, close, volume," +
-                                    "       close_time, quote_volume, trade_count, buy_volume, buy_quote_volume" +
-                    ") FROM STDIN (FORMAT BINARY)"))
+                using (var conn = new NpgsqlConnection(_connString))
                 {
-                    foreach (var item in data)
+                    await conn.OpenAsync();
+
+                    using (var writer = conn.BeginBinaryImport("COPY spot_klines_1d (" +
+                                        "       symbol, open_time, open, high, low, close, volume," +
+                                        "       close_time, quote_volume, trade_count, buy_volume, buy_quote_volume" +
+                        ") FROM STDIN (FORMAT BINARY)"))
                     {
-                        writer.StartRow();
-                        writer.Write(symbol);
-                        writer.Write(item.OpenTime);
-                        writer.Write(item.OpenPrice);
-                        writer.Write(item.HighPrice);
-                        writer.Write(item.LowPrice);
-                        writer.Write(item.ClosePrice);
-                        writer.Write(item.Volume);
-                        writer.Write(item.CloseTime);
-                        writer.Write(item.QuoteVolume);
-                        writer.Write(item.TradeCount);
-                        writer.Write(item.TakerBuyBaseVolume);
-                        writer.Write(item.TakerBuyQuoteVolume);
+                        foreach (var item in data)
+                        {
+                            writer.StartRow();
+                            writer.Write(symbol);
+                            writer.Write(item.OpenTime);
+                            writer.Write(item.OpenPrice);
+                            writer.Write(item.HighPrice);
+                            writer.Write(item.LowPrice);
+                            writer.Write(item.ClosePrice);
+                            writer.Write(item.Volume);
+                            writer.Write(item.CloseTime);
+                            writer.Write(item.QuoteVolume);
+                            writer.Write(item.TradeCount);
+                            writer.Write(item.TakerBuyBaseVolume);
+                            writer.Write(item.TakerBuyQuoteVolume);
+                        }
+                        writer.Complete();
                     }
                 }
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex, $"InsertSpotTable {symbol} {data.Count}");
+                return false;
             }
         }
 
@@ -158,11 +168,11 @@ namespace BNLib.DB
                 foreach (var kline in data)
                 {
                     var cmd = new NpgsqlCommand("INSERT INTO spot_klines_1d" +
-                        "       (symbol, date)" +
-                        "VALUES(@symbol, @date)" 
+                        "       (symbol, open_time)" +
+                        "VALUES(@symbol, @open_time)"
                         );
                     cmd.Parameters.AddWithValue("symbol", symbol);
-                    cmd.Parameters.AddWithValue("date", kline.OpenTime);
+                    cmd.Parameters.AddWithValue("open_time", kline.OpenTime);
                     await cmd.ExecuteNonQueryAsync();
                 }
             }
@@ -172,34 +182,23 @@ namespace BNLib.DB
         {
             using (var conn = new NpgsqlConnection(_connString))
             {
-                while (true)
-                {
-                    try
-                    {
-                        await conn.OpenAsync();
-                        break;
-                    }
-                    catch (PostgresException ex)
-                    {
-                        _logger.Information("GetSymbolCurDateRange: {0}", ex.Message);
-                        await Task.Delay(5000);
-                    }
-                }
+                await conn.OpenAsync();
 
                 var cmd = new NpgsqlCommand("SELECT MIN(open_time), MAX(open_time) FROM spot_klines_1d " +
 "WHERE symbol = @symbol HAVING COUNT(*) > 0;", conn);
                 cmd.Parameters.AddWithValue("symbol", sym);
 
                 var reader = await cmd.ExecuteReaderAsync();
-                DateTime begDate = DateTime.Today;
+                DateTime begDate = DateTime.Now.ToUniversalTime();
                 DateTime endDate = begDate.AddDays(-1);
                 while (reader.Read())
                 {
                     begDate = reader.GetDateTime(0);
                     endDate = reader.GetDateTime(1);
                 }
+                DateTime.SpecifyKind(begDate, DateTimeKind.Utc);
+                DateTime.SpecifyKind(endDate, DateTimeKind.Utc);
                 return (begDate, endDate);
-
             }
         }
     }

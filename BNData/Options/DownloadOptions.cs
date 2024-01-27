@@ -70,6 +70,7 @@ namespace BNData.Options
             if (strBegDate == null)
                 throw new Exception("Cannot find begin_date config");
             var tbegDate = DateTime.Parse(strBegDate);
+            DateTime.SpecifyKind(tbegDate, DateTimeKind.Utc);
 
             KlinesUpdate up = new KlinesUpdate();
 

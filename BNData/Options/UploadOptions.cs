@@ -77,9 +77,20 @@ namespace BNData.Options
                 var klines = Utils.ParseKlinesCSV(lines);
                 // upload
                 var db = GetDB();
-                db.InsertSpotTable(symbol, klines).Wait();
+                var res = db.InsertSpotTable(symbol, klines);
+                res.Wait();
+                bool succ = res.Result;
+                if (!succ)
+                {
+                    Console.WriteLine($"Upload {filepath} failed");
+                    return -1;
+                }
+                else
+                {
+                    Console.WriteLine($"Upload {filepath} success");
+                    return 0;
+                }
             }
-            return 0;
         }
         private int UploadDir(string dirpath)
         {
@@ -89,10 +100,35 @@ namespace BNData.Options
                 return -1;
             }
 
+            // 已成功上传的Symbol
+            HashSet<string> existSyms = new HashSet<string>();
+            string succFile = Path.Combine(dirpath, "000000.txt");
+            if (File.Exists(succFile))
+            {
+                string[] lines = File.ReadAllLines(succFile);
+                foreach (var line in lines)
+                {
+                    if (string.IsNullOrEmpty(line))
+                        continue;
+                    existSyms.Add(line);
+                }
+            }
+
             var files = Directory.GetFiles(dirpath);
             foreach (var f in files)
             {
-                UploadFile(f);
+                if (f.EndsWith(".csv"))
+                {
+                    // 过滤掉已上传成功的文件
+                    if (existSyms.Contains(f))
+                        continue;
+
+                    int succ = UploadFile(f);
+                    if (succ == 0)
+                    {
+                        File.AppendAllText(succFile, f + "\n");
+                    }
+                }
             }
             return 0;
         }

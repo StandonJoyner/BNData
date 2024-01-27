@@ -26,7 +26,7 @@ namespace BNData
         static void Main(string[] args)
         {
             Log.Logger = new LoggerConfiguration()
-                .WriteTo.File("logs/myapp.txt", rollingInterval: RollingInterval.Day)
+                .WriteTo.File("logs/BNData-.log", rollingInterval: RollingInterval.Day)
                 .WriteTo.Console(Serilog.Events.LogEventLevel.Error)
                 .CreateLogger();
 
