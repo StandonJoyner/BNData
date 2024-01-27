@@ -43,7 +43,7 @@ namespace BNLib.Frame
         }
 
         public async Task DownloadKlinesAll(PgDB db, MarketType market, string symbol, 
-            KlineInterval inv, DateTime tbegDate, TextWriter output)
+            KlineInterval inv, DateTime tbegDate, string outfile)
         {
             var tendDate = DateTime.Now.ToUniversalTime().AddDays(-1);
             if (inv != KlineInterval.OneDay)
@@ -51,17 +51,21 @@ namespace BNLib.Frame
             try
             {
                 var lines = await GetLackKlines(db, market, symbol, inv, tbegDate, tendDate);
-
-                // store lines to csv file
-                foreach (var line in lines)
+                if (lines.Count == 0)
+                    return;
+                using (TextWriter output = new StreamWriter(outfile))
                 {
-                    DateTimeOffset dtoffset0 = new DateTimeOffset(line.OpenTime);
-                    long opentm = dtoffset0.ToUnixTimeMilliseconds();
+                    // store lines to csv file
+                    foreach (var line in lines)
+                    {
+                        DateTimeOffset dtoffset0 = new DateTimeOffset(line.OpenTime);
+                        long opentm = dtoffset0.ToUnixTimeMilliseconds();
 
-                    DateTimeOffset dtoffset1 = new DateTimeOffset(line.CloseTime);
-                    long closetm = dtoffset1.ToUnixTimeMilliseconds();
+                        DateTimeOffset dtoffset1 = new DateTimeOffset(line.CloseTime);
+                        long closetm = dtoffset1.ToUnixTimeMilliseconds();
 
-                    output.WriteLine($"{opentm},{line.OpenPrice},{line.HighPrice},{line.LowPrice},{line.ClosePrice},{line.Volume},{closetm},{line.QuoteVolume},{line.TradeCount},{line.TakerBuyBaseVolume},{line.TakerBuyQuoteVolume},{line.Ignore}");
+                        output.WriteLine($"{opentm},{line.OpenPrice},{line.HighPrice},{line.LowPrice},{line.ClosePrice},{line.Volume},{closetm},{line.QuoteVolume},{line.TradeCount},{line.TakerBuyBaseVolume},{line.TakerBuyQuoteVolume},{line.Ignore}");
+                    }
                 }
             }
             catch (Exception ex)

@@ -77,7 +77,7 @@ namespace BNData.Options
             // make dir to save klines
             DateTime now = DateTime.Now;
             string outputDir = "klines";
-            outputDir = Path.Combine(outputDir, now.ToString("yyyyMMdd_hh_mm"));
+            outputDir = Path.Combine(outputDir, now.ToString("yyyyMMdd_hh"));
 
             if (!Directory.Exists(outputDir))
                 Directory.CreateDirectory(outputDir);
@@ -87,14 +87,11 @@ namespace BNData.Options
             {
                 var t = Task.Run(async () =>
                 {
-                    // create new file
                     var newfile = Path.Combine(outputDir, $"{s}.csv");
                     if (File.Exists(newfile))
                         File.Delete(newfile);
-                    using (TextWriter tw = new StreamWriter(newfile))
-                    {
-                        await up.DownloadKlinesAll(db, MarketType.SPOT, s, KlineInterval.OneDay, tbegDate, tw);
-                    }
+
+                    await up.DownloadKlinesAll(db, MarketType.SPOT, s, KlineInterval.OneDay, tbegDate, newfile);
                 });
                 tasks.Add(t);
                 if (tasks.Count > 30)
@@ -103,6 +100,7 @@ namespace BNData.Options
                     tasks.Clear();
                 }
             }
+            Task.WaitAll(tasks.ToArray());
             return 0;
         }
     }
