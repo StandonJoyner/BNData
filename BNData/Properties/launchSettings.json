@@ -2,7 +2,7 @@
   "profiles": {
     "BNData": {
       "commandName": "Project",
-      "commandLineArgs": "init"
+      "commandLineArgs": "upload --input=klines\\20240127_07"
     }
   }
 }

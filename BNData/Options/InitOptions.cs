@@ -32,9 +32,13 @@ namespace BNData.Options
             if (host == null || port == null || user == null || passwd == null)
                 throw new Exception("Cannot find db config");
 
+            // 安装postgresql
+            // 修改密码 ALTER USER postgres WITH PASSWORD '123456';
+            // 修改端口
+            // 安装timescaledb
+            // 配置timescaledb-tune
             // 要先创建数据库: CREATE DATABASE bndata;
             // 允许远程连接
-            // 修改密码 ALTER USER postgres WITH PASSWORD '123456';
             // 启用timescaledb
             PgDB db = new PgDB();
             db.InitDB(host, port, user, passwd, "bndata")

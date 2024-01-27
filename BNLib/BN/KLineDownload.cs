@@ -8,11 +8,13 @@ using Binance.Net.Clients;
 using Binance.Net.Objects.Models.Spot;
 using Binance.Net.Enums;
 using Binance.Net.Objects.Models;
+using Serilog;
 
 namespace BNLib.BN
 {
     public class KLineDownload
     {
+        static ILogger _logger = Serilog.Log.ForContext<KLineDownload>();
         public static string GetMonthlyKlinesUrl(MarketType type, string code, KlineInterval inv, DateTime dt)
         {
             string interval;
@@ -52,7 +54,7 @@ namespace BNLib.BN
             {
                 var url = GetMonthlyKlinesUrl(type, symbol, inv, dt1);
                 var zipData = await Utils.DownloadZip(url);
-                if (zipData != null)
+                if (zipData != null && zipData.Length > 0)
                 {
                     var lines = await Utils.ParseZip(zipData);
                     var table = Utils.ParseKlinesCSV(lines);
@@ -60,7 +62,7 @@ namespace BNLib.BN
                 }
                 else 
                 {
-                    Console.WriteLine($"Download {url} failed.");
+                    _logger.Warning($"Download {symbol} {dt1.Year}-{dt1.Month} failed.");
                 }
                 dt1 = dt1.AddMonths(1);
             }
@@ -77,7 +79,7 @@ namespace BNLib.BN
             {
                 var url = GetDailyKlinesUrl(type, symbol, inv, dt1);
                 var zipData = await Utils.DownloadZip(url);
-                if (zipData != null)
+                if (zipData != null && zipData.Length > 0)
                 {
                     var lines = await Utils.ParseZip(zipData);
                     var table = Utils.ParseKlinesCSV(lines);
@@ -85,7 +87,7 @@ namespace BNLib.BN
                 }
                 else
                 {
-                    Console.WriteLine($"Download {url} failed.");
+                    _logger.Warning($"Download {symbol} {dt1} failed.");
                 }
                 dt1 = dt1.AddDays(1);
             }

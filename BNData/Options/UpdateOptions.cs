@@ -17,12 +17,12 @@ namespace BNData.Options
     [Verb("update", HelpText = "Update database.")]
     internal class UpdateOptions
     {
-        private static readonly ILogger Log = Serilog.Log.ForContext<UpdateOptions>();
+        private static readonly ILogger _logger = Serilog.Log.ForContext<UpdateOptions>();
 
         [Option('s', "symbols", Required = false, HelpText = "Coin symbols")]
         public string? _symbol { get; set; }
 
-        [Option('i', "input", Required = false, HelpText = "Input symbol file")]
+        [Option('i', "input", Required = false, HelpText = "Input dir/file")]
         public string? _inputfile { get; set; }
 
         [Option('b', "begdate", Required = false, HelpText = "Begin date")]
@@ -31,7 +31,7 @@ namespace BNData.Options
         [Option('e', "enddate", Required = false, HelpText = "End date")]
         public string? _enddate { get; set; }
 
-        [Option('o', "output", Required = false, HelpText = "Output file name")]
+        [Option('o', "output", Required = false, HelpText = "Output dir name")]
         public string? _output { get; set; }
 
         public int Run()
@@ -65,39 +65,45 @@ namespace BNData.Options
         public int UpdateDB()
         {
             if (_symbol == null && _inputfile == null)
-                return UpdateDBAll().Result;
+                return UpdateDBAll();
             else if (_symbol != null)
                 return UpdateDBSymbol(_symbol).Result;
             else
                 return -1;
         }
 
-        public async Task<int> UpdateDBAll()
+        public int UpdateDBAll()
         {
             var db = GetDB();
             KlinesUpdate up = new KlinesUpdate();
-            var syms = await ExchangeInfo.GetAllSymbols(MarketType.SPOT, true);
+            var result = ExchangeInfo.GetAllSymbols(MarketType.SPOT, true);
+            result.Wait();
+            var syms = result.Result;
+
+            List<Task> tasks = new List<Task>();
             foreach (var s in syms)
             {
-                Log.Information($"Update {s}");
-                await up.UpdateKlinesAll(db, MarketType.SPOT, s, KlineInterval.OneDay);
+                var t = Task.Run(async () =>
+                {
+                    Log.Information($"Update {s}");
+                    // await up.DownloadKlinesAll(db, MarketType.SPOT, s, KlineInterval.OneDay);
+                });
+                tasks.Add(t);
             }
+            Task.WaitAll(tasks.ToArray());
             return 0;
         }
 
         public async Task<int> UpdateDBSymbol(string symbol)
         {
             var db = GetDB();
+            string? strBegDate = ConfigurationManager.AppSettings["begin_date"];
+            if (strBegDate == null)
+                throw new Exception("Cannot find begin_date config");
+
             KlinesUpdate up = new KlinesUpdate();
-            await up.UpdateKlinesAll(db, MarketType.SPOT, symbol, KlineInterval.OneDay);
+            // await up.UpdateKlinesAll(db, MarketType.SPOT, symbol, KlineInterval.OneDay);
             return 0;
         }
-
-        void testMerge()
-        {
-            KlinesUpdate up = new KlinesUpdate();
-            up.GetLackKlines(MarketType.SPOT, "BTCUSDT", KlineInterval.OneDay, new DateTime(2021, 1, 1), new DateTime(2023, 12, 30)).Wait();
-        }
-
     }
 }

@@ -9,12 +9,17 @@ using Binance.Net.Objects.Models.Spot;
 using Microsoft.VisualBasic;
 using System.Reflection;
 using System.Data;
+using Npgsql.Bulk;
+using Microsoft.EntityFrameworkCore;
+using CryptoExchange.Net.CommonObjects;
+using Serilog;
 
 namespace BNLib.DB
 {
     public partial class PgDB
     {
         private string _connString = "Host=localhost;Username=visitor;Password=123456;DataBase=bndata";
+        static ILogger _logger = Serilog.Log.ForContext<PgDB>();
         public PgDB()
         {
         }
@@ -48,7 +53,8 @@ namespace BNLib.DB
 
         public void Connect(string host, string port, string user, string passwd, string db)
         {
-            _connString = $"Host={host};Port={port};Username={user};Password={passwd};DataBase={db}";
+            _connString = $"Host={host};Port={port};Username={user};Password={passwd};DataBase={db};" +
+                $"Pooling=true";
         }
 
         public async Task<DataTable> QueryDataAsync(string sql)
@@ -96,32 +102,53 @@ namespace BNLib.DB
             return lines;
         }
 
+        class spot_klines_1d
+        {
+            public string symbol { get; set; }
+            public DateTime date { get; set; }
+            public decimal open { get; set; }
+            public decimal high { get; set; }
+            public decimal low { get; set; }
+            public decimal close { get; set; }
+            public decimal volume { get; set; }
+            public DateTime close_time { get; set; }
+            public decimal quote_volume { get; set; }
+            public int trade_count { get; set; }
+            public decimal buy_volume { get; set; }
+            public decimal buy_quote_volume { get; set; }
+        }
+
         public async Task InsertSpotTable(string symbol, List<BinanceSpotKline> data)
         {
             using (var conn = new NpgsqlConnection(_connString))
             {
+                await conn.OpenAsync();
+
+                List<spot_klines_1d> klines = new List<spot_klines_1d>();
                 foreach (var kline in data)
                 {
-                    var cmd = new NpgsqlCommand("INSERT INTO spot_klines_1d (" +
-                                        "       symbol, date, open, high, low, close, volume," +
-                                        "       close_time, quote_volume, trade_count, buy_volume, buy_quote_volume" +
-                                        "       )" +
-                                        "VALUES(@symbol, @date, @open, @high, @low, @close, @volume," +
-                                        "       @close_time, @quote_volume, @trade_count, @buy_volume, @buy_quote_volume" +
-                                        ");", conn);
-                    cmd.Parameters.AddWithValue("symbol", symbol);
-                    cmd.Parameters.AddWithValue("date", kline.OpenTime);
-                    cmd.Parameters.AddWithValue("open", kline.OpenPrice);
-                    cmd.Parameters.AddWithValue("high", kline.HighPrice);
-                    cmd.Parameters.AddWithValue("low", kline.LowPrice);
-                    cmd.Parameters.AddWithValue("close", kline.ClosePrice);
-                    cmd.Parameters.AddWithValue("volume", kline.Volume);
-                    cmd.Parameters.AddWithValue("close_time", kline.CloseTime);
-                    cmd.Parameters.AddWithValue("quote_volume", kline.QuoteVolume);
-                    cmd.Parameters.AddWithValue("trade_count", kline.TradeCount);
-                    cmd.Parameters.AddWithValue("buy_volume", kline.TakerBuyBaseVolume);
-                    cmd.Parameters.AddWithValue("buy_quote_volume", kline.TakerBuyQuoteVolume);
-                    await cmd.ExecuteNonQueryAsync();
+                    klines.Add(new spot_klines_1d
+                    {
+                        symbol = symbol,
+                        date = kline.OpenTime,
+                        open = kline.OpenPrice,
+                        high = kline.HighPrice,
+                        low = kline.LowPrice,
+                        close = kline.ClosePrice,
+                        volume = kline.Volume,
+                        close_time = kline.CloseTime,
+                        quote_volume = kline.QuoteVolume,
+                        trade_count = kline.TradeCount,
+                        buy_volume = kline.TakerBuyBaseVolume,
+                        buy_quote_volume = kline.TakerBuyQuoteVolume
+                    });
+                }
+                var optionsBuilder = new DbContextOptionsBuilder<DbContext>();
+                optionsBuilder.UseNpgsql(conn);
+                using (var context = new DbContext(optionsBuilder.Options))
+                {
+                    var uploader = new NpgsqlBulkUploader(context);
+                    uploader.Insert(klines);
                 }
             }
         }
@@ -131,6 +158,7 @@ namespace BNLib.DB
         {
             using (var conn = new NpgsqlConnection(_connString))
             {
+                await conn.OpenAsync();
                 foreach (var kline in data)
                 {
                     var cmd = new NpgsqlCommand("INSERT INTO spot_klines_1d" +
@@ -148,9 +176,24 @@ namespace BNLib.DB
         {
             using (var conn = new NpgsqlConnection(_connString))
             {
+                while (true)
+                {
+                    try
+                    {
+                        await conn.OpenAsync();
+                        break;
+                    }
+                    catch (PostgresException ex)
+                    {
+                        _logger.Information("GetSymbolCurDateRange: {0}", ex.Message);
+                        await Task.Delay(5000);
+                    }
+                }
+
                 var cmd = new NpgsqlCommand("SELECT MIN(date), MAX(date) FROM spot_klines_1d " +
-                "WHERE symbol = @symbol HAVING COUNT(*) > 0;", conn);
+"WHERE symbol = @symbol HAVING COUNT(*) > 0;", conn);
                 cmd.Parameters.AddWithValue("symbol", sym);
+
                 var reader = await cmd.ExecuteReaderAsync();
                 DateTime begDate = DateTime.Today;
                 DateTime endDate = begDate.AddDays(-1);
@@ -160,7 +203,8 @@ namespace BNLib.DB
                     endDate = reader.GetDateTime(1);
                 }
                 return (begDate, endDate);
-           }
+
+            }
         }
     }
 }

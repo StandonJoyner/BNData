@@ -3,7 +3,6 @@
 using Binance.Net.Enums;
 using BNLib.Frame;
 using BNLib.Enums;
-using log4net;
 using CommandLine;
 using BNData.Options;
 using Serilog;
@@ -28,12 +27,14 @@ namespace BNData
         {
             Log.Logger = new LoggerConfiguration()
                 .WriteTo.File("logs/myapp.txt", rollingInterval: RollingInterval.Day)
+                .WriteTo.Console(Serilog.Events.LogEventLevel.Error)
                 .CreateLogger();
 
-            Parser.Default.ParseArguments<InitOptions, UpdateOptions>(args)
+            Parser.Default.ParseArguments<InitOptions, DownloadOptions, UploadOptions>(args)
                 .MapResult(
                     (InitOptions opts) => opts.Run(),
-                    (UpdateOptions opts) => opts.Run(),
+                    (DownloadOptions opts) => opts.Run(),
+                    (UploadOptions opts) => opts.Run(),
                     errs => 1
                 );
         }
@@ -44,8 +45,8 @@ namespace BNData
             DateTime endDate = new DateTime(2023, 12, 7);
             //KLineDownload.DownloadMonthlyKLines(MarketType.SPOT, "BTCUSDT", KlineInterval.OneMonth, begDate, endDate).Wait();
 
-            KlinesUpdate up = new KlinesUpdate();
-            up.GetKlines(MarketType.SPOT, "BTCUSDT", KlineInterval.OneDay, begDate, endDate).Wait();
+            //KlinesUpdate up = new KlinesUpdate();
+            //up.GetKlines(MarketType.SPOT, "BTCUSDT", KlineInterval.OneDay, begDate, endDate).Wait();
             //up.UpdateKlines(MarketType.SPOT, "BTCUSDT", begDate, endDate).Wait();
         }
     }

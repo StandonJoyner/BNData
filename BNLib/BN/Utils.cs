@@ -1,5 +1,6 @@
 ﻿using Binance.Net.Objects.Models.Spot;
 using CryptoExchange.Net.Attributes;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.IO.Compression;
@@ -11,6 +12,7 @@ namespace BNLib.BN
 {
     public class Utils
     {
+        static ILogger _logger = Serilog.Log.ForContext<Utils>();
         public static async Task<byte[]> DownloadZip(string fullurl)
         {
             try
@@ -20,16 +22,20 @@ namespace BNLib.BN
                     return await client.GetByteArrayAsync(fullurl);
                 }
             }
+            catch (HttpRequestException ex)
+            {
+                _logger.Warning($"DownloadZip {fullurl}");
+            }
             catch (Exception ex)
             {
-                Console.WriteLine(ex.Message);
+                _logger.Error(ex, $"DownloadZip {fullurl}");
             }
             return [];
         }
 
         public static async Task<string[]> ParseZip(byte[] data)
         {
-            if (data == null)
+            if (data == null || data.Length == 0)
                 return [];
             var ms = new System.IO.MemoryStream(data);
             var zip = new System.IO.Compression.ZipArchive(ms);
