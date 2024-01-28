@@ -66,7 +66,9 @@ namespace BNData.Options
         public async Task<int> DownloadSymbols(IEnumerable<string> syms)
         {
             var db = GetDB();
-            string? strBegDate = ConfigurationManager.AppSettings["begin_date"];
+
+            var config = ConfigurationManager.OpenExeConfiguration(ConfigurationUserLevel.None);
+            var strBegDate = config.AppSettings.Settings["begin_date"].Value;
             if (strBegDate == null)
                 throw new Exception("Cannot find begin_date config");
             var tbegDate = DateTime.Parse(strBegDate);
@@ -101,6 +103,10 @@ namespace BNData.Options
                 }
             }
             Task.WaitAll(tasks.ToArray());
+            // 更新begin_date
+            var newdate = DateTime.Now.ToUniversalTime().ToString("yyyy-MM-dd");
+            config.AppSettings.Settings["begin_date"].Value = newdate;
+            config.Save(ConfigurationSaveMode.Modified);
             return 0;
         }
     }
