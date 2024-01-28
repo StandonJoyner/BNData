@@ -74,6 +74,27 @@ namespace BNLib.DB
             }
         }
 
+        public async Task<bool> ExecuteSQLAsync(string sql)
+        {
+            try
+            {
+                using (var conn = new NpgsqlConnection(_connString))
+                {
+                    await conn.OpenAsync();
+                    using (var cmd = new NpgsqlCommand(sql, conn))
+                    {
+                        await cmd.ExecuteNonQueryAsync();
+                    }
+                }
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex, $"ExecuteSQLAsync {sql}");
+                return false;
+            }
+        }
+
         public async Task<List<BinanceSpotKline>> QueryKlinesAsync(string symbol, DateTime beg, DateTime end)
         {
             string begStr = beg.ToString("yyyy-MM-dd");
@@ -189,7 +210,7 @@ namespace BNLib.DB
                 cmd.Parameters.AddWithValue("symbol", sym);
 
                 var reader = await cmd.ExecuteReaderAsync();
-                DateTime begDate = DateTime.Now.ToUniversalTime();
+                DateTime begDate = DateTime.UtcNow;
                 DateTime endDate = begDate.AddDays(-1);
                 while (reader.Read())
                 {

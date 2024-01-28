@@ -8,12 +8,24 @@ using ListTable = System.Collections.Generic.List<System.Collections.Generic.Key
 using System.Text;
 using System.IO.Compression;
 using BNAPI.Common;
+using CryptoExchange.Net.CommonObjects;
+using System.Threading;
+using Microsoft.VisualBasic;
+using Microsoft.AspNetCore.Http;
 
 namespace BNAPI.Controllers
 {
+    struct DHParams
+    {
+        public string[] symbols;
+        public string[] indis;
+        public DateTime tbeg;
+        public DateTime tend;
+        public string? ext;
+    }
     struct RequestStatus
     {
-        public int    err_code;
+        public int err_code;
         public string err_msg;
     }
     [Route("v1/BN/[controller]")]
@@ -21,10 +33,119 @@ namespace BNAPI.Controllers
     public class KlinesController : ControllerBase
     {
         private readonly ILogger<KlinesController> _logger;
+        static SemaphoreSlim _semaphore = new SemaphoreSlim(90);
         public KlinesController(ILogger<KlinesController> logger)
         {
             _logger = logger;
         }
+
+        [HttpGet("DataHistory")]
+        public async Task<IActionResult> GetDH(string symbols, string indis, string tbeg, string tend, string? ext = null)
+        {
+            _logger.LogInformation($"GetDS {RemoteIP()} {symbols} {indis} {tbeg} {tend} {ext}");
+
+            try
+            {
+                await _semaphore.WaitAsync();
+                try
+                {
+                    DHParams dhParams = CheckAndParse(symbols, indis, tbeg, tend, ext);
+                    var result = await GetDHAll(dhParams);
+
+                    var json = JsonConvert.SerializeObject(result);
+                    return Ok(json);
+                }
+                catch (Exception e)
+                {
+                    _logger.LogError(e.Message);
+                    return BadRequest(e.Message);
+                }
+            }
+            finally
+            {
+                _semaphore.Release();
+            }
+        }
+
+        DHParams CheckAndParse(string symbols, string indis, string tbeg, string tend, string? ext)
+        {
+            if (symbols == null || symbols.Length == 0)
+            {
+                throw new Exception("Missing symbols");
+            }
+            if (indis == null || indis.Length == 0)
+            {
+                throw new Exception("Missing indicators");
+            }
+            DHParams dhParams = new DHParams();
+            var symbol = symbols.Split(',');
+            dhParams.symbols = new string[symbol.Length];
+            for (int i = 0; i < symbol.Length; i++)
+            {
+                var assets = symbol[i].Split('/');
+                if (assets.Length != 2)
+                {
+                    throw new Exception($"Invalid symbol {symbol[i]}");
+                }
+                dhParams.symbols[i] = assets[0] + assets[1];
+            }
+            dhParams.indis = indis.Split(',');
+
+            if (!DateTime.TryParse(tbeg, out DateTime tbegDate))
+            {
+                throw new Exception("Invalid begin date");
+            }
+            if (!DateTime.TryParse(tend, out DateTime tendDate))
+            {
+                throw new Exception("Invalid end date");
+            }
+            if (tbegDate >= tendDate)
+            {
+                throw new Exception("Begin date must be earlier than end date");
+            }
+            DateTime.SpecifyKind(tbegDate, DateTimeKind.Utc);
+            DateTime.SpecifyKind(tendDate, DateTimeKind.Utc);
+            dhParams.tbeg = tbegDate;
+            dhParams.tend = tendDate;
+            dhParams.ext = ext;
+            return dhParams;
+        }
+
+        private async Task<Dictionary<string, object>> GetDHAll(DHParams dhParams)
+        {
+            var columns = GetSQLColumns(dhParams.indis, dhParams.tbeg, dhParams.tend, dhParams.ext);
+
+            int cells = 0;
+            var dict = new List<KeyValuePair<string, ListTable>>(dhParams.symbols.Length);
+            foreach (var s in dhParams.symbols)
+            {
+                var ds = await GetDHOne(s, columns, dhParams.tbeg, dhParams.tend);
+                cells += ds[0].Value.Count;
+                dict.Add(new KeyValuePair<string, ListTable>(s, ds));
+            }
+            _logger.LogInformation($"GetDS cells {cells}");
+
+            var result = new Dictionary<string, object>();
+            result["data"] = dict;
+            result["status"] = new RequestStatus { err_code = 0, err_msg = "OK" };
+
+            await RecordLog(dhParams, cells);
+            return result;
+        }
+
+        private async Task<ListTable> GetDHOne(string symbol, string columns, DateTime tbeg, DateTime tend)
+        {
+            string strBegin = tbeg.ToString("yyyy-MM-dd");
+            string strEnd = tend.ToString("yyyy-MM-dd");
+            var sql = $"SELECT {columns} FROM spot_klines_1d " +
+                $"WHERE symbol='{symbol}' AND" +
+                $"      open_time >= '{strBegin}' and open_time <= '{strEnd}'" +
+                $"ORDER BY open_time ASC;";
+            var db = GetDB();
+            var table = await db.QueryDataAsync(sql);
+            return Convert(table);
+        }
+
         private ListTable Convert(DataTable dt)
         {
             var dict = new ListTable(dt.Columns.Count);
@@ -42,47 +163,10 @@ namespace BNAPI.Controllers
             }
             return dict;
         }
-        [HttpGet("dateseries")]
-        public async Task<IActionResult> GetDS(string symbols, string indis, string tbeg, string tend, string? ext = null)
-        {
-            _logger.LogInformation($"GetDS {symbols} {indis} {tbeg} {tend} {ext}");
-            var symbol = symbols.Split(',');
-            var indiAry = indis.Split(',');
-            if (!DateTime.TryParse(tbeg, out DateTime tbegDate))
-            {
-                return BadRequest("Invalid tbeg parameter");
-            }
-            if (!DateTime.TryParse(tend, out DateTime tendDate))
-            {
-                return BadRequest("Invalid tend parameter");
-            }
-            var columns = GetSQLColumns(indiAry, tbegDate, tendDate, ext);
-
-            int cells = 0;
-            var dict = new List<KeyValuePair<string, ListTable>>(symbol.Length);
-            foreach (var s in symbol)
-            {
-                var assets = s.Split('/');
-                if (assets.Length != 2)
-                {
-                    return BadRequest("Invalid symbol parameter");
-                }
-                var ds = await GetDSOne(assets[0] + assets[1], columns, tbegDate, tendDate);
-                cells += ds[0].Value.Count;
-                dict.Add(new KeyValuePair<string, ListTable>(s, ds));
-            }
-            _logger.LogInformation($"GetDS cells {cells}");
-            var result = new Dictionary<string, object>();
-            result["data"] = dict;
-            result["status"] = new RequestStatus { err_code = 0, err_msg = "OK" };
-
-            var json = JsonConvert.SerializeObject(result);
-            return Ok(json);
-        }
 
         private string GetSQLColumns(string[] indis, DateTime tbeg, DateTime tend, string? ext)
         {
-            string[] legals= {"open", "high", "low", "close", "volume"};
+            string[] legals = { "open", "high", "low", "close", "volume" };
             foreach (var i in indis)
             {
                 if (!legals.Contains(i))
@@ -99,19 +183,6 @@ namespace BNAPI.Controllers
             return sql.ToString();
         }
 
-        private async Task<ListTable> GetDSOne(string symbol, string columns, DateTime tbeg, DateTime tend)
-        {
-            string strBegin = tbeg.ToString("yyyy-MM-dd");
-            string strEnd = tend.ToString("yyyy-MM-dd");
-            var sql = $"SELECT {columns} FROM spot_klines_1d " +
-                $"WHERE symbol='{symbol}' AND" +
-                $"      date >= '{strBegin}' and date <= '{strEnd}'" +
-                $";";
-            var db = GetDB();
-            var table = await db.QueryDataAsync(sql);
-            return Convert(table);
-        }
-
         PgDB GetDB()
         {
             // 要先创建数据库: CREATE DATABASE bndata;
@@ -122,6 +193,28 @@ namespace BNAPI.Controllers
                 DBConfig.Instance.Password,
                 DBConfig.Instance.DB);
             return db;
+        }
+
+        string RemoteIP()
+        {
+            var ip = HttpContext.Connection.RemoteIpAddress;
+            if (ip != null)
+                return ip.ToString();
+            else
+                return "unknown";
+        }
+
+        async Task RecordLog(DHParams dhParams, int cells)
+        {
+            var symbols = string.Join(',', dhParams.symbols);
+            var indis = string.Join(',', dhParams.indis);
+            var strParam = symbols + " " + indis;
+
+            var db = GetDB();
+            var sql = $"INSERT INTO request_logs (ip, sql, cells, err) " +
+                $"VALUES ('{RemoteIP()}', '{strParam}', " +
+                $"'{cells}', '');";
+            await db.ExecuteSQLAsync(sql);
         }
     }
 }

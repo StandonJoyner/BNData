@@ -31,7 +31,7 @@ namespace BNLib.Frame
         private async Task UpdateKlinesAll(PgDB db, MarketType market, string symbol, KlineInterval inv)
         { 
             var tbegDate = new DateTime(2017, 8, 17, 0, 0, 0);
-            var tendDate = DateTime.Now.ToUniversalTime().AddDays(-1);
+            var tendDate = DateTime.UtcNow.AddDays(-1);
             if (inv != KlineInterval.OneDay)
                 throw new Exception("Only support daily klines");
             var lines = await GetLackKlines(db, market, symbol,inv, tbegDate, tendDate);
@@ -45,7 +45,7 @@ namespace BNLib.Frame
         public async Task DownloadKlinesAll(PgDB db, MarketType market, string symbol, 
             KlineInterval inv, DateTime tbegDate, string outfile)
         {
-            var tendDate = DateTime.Now.ToUniversalTime().AddDays(-1);
+            var tendDate = DateTime.UtcNow.AddDays(-1);
             if (inv != KlineInterval.OneDay)
                 throw new Exception("Only support daily klines");
             try
@@ -107,7 +107,7 @@ namespace BNLib.Frame
         public async Task<List<BinanceSpotKline>> GetLackKlinesAll(PgDB db, MarketType market, string symbol, 
             KlineInterval inv, DateTime tbegDate)
         {
-            var lastDay = DateTime.Now.ToUniversalTime().AddDays(-1);
+            var lastDay = DateTime.UtcNow.AddDays(-1);
             return await GetLackKlines(db, market, symbol, inv, tbegDate, lastDay);
         }
 
@@ -211,7 +211,7 @@ namespace BNLib.Frame
             if (beg > end)
                 return new List<BinanceSpotKline>();
             _logger.Information($"GetKlineMonthly: {symbol} {inv} {beg} {end}");
-            var now = DateTime.Now.ToUniversalTime();
+            var now = DateTime.UtcNow;
             var mend = end;
             if (end > now)
                 mend = now;

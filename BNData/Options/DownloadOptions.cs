@@ -104,7 +104,7 @@ namespace BNData.Options
             }
             Task.WaitAll(tasks.ToArray());
             // 更新begin_date
-            var newdate = DateTime.Now.ToUniversalTime().ToString("yyyy-MM-dd");
+            var newdate = DateTime.UtcNow.ToString("yyyy-MM-dd");
             config.AppSettings.Settings["begin_date"].Value = newdate;
             config.Save(ConfigurationSaveMode.Modified);
             return 0;
