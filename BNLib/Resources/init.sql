@@ -2,6 +2,7 @@
 
 DROP TABLE IF EXISTS request_logs;
 DROP TABLE IF EXISTS spot_klines_1d;
+DROP TABLE IF EXISTS spot_symbols_info;
 
 CREATE TABLE spot_klines_1d (
 	symbol TEXT NOT NULL,
@@ -30,8 +31,28 @@ CREATE TABLE request_logs (
 SELECT create_hypertable('request_logs', by_range('time'));
 CREATE INDEX ix_ip_time ON request_logs (ip, time DESC);
 
+CREATE TABLE spot_symbols_info (
+	symbol TEXT UNIQUE,
+	quote_asset TEXT NOT NULL,
+	base_asset TEXT NOT NULL,
+	quote_asset_precision INTEGER NOT NULL,
+	base_asset_precision INTEGER NOT NULL,
+	quote_fee_precision INTEGER NOT NULL,
+	base_fee_precision INTEGER NOT NULL,
+
+	iceberg_allowed BOOLEAN NOT NULL,
+	oco_allowed BOOLEAN NOT NULL,
+	quote_order_qty_market_allowed BOOLEAN NOT NULL,
+	is_spot_trading_allowed BOOLEAN NOT NULL,
+	is_margin_trading_allowed BOOLEAN NOT NULL,
+
+	created_at TIMESTAMP NOT NULL,
+	updated_at TIMESTAMP NOT NULL
+);
+
 DROP USER IF EXISTS visitor;
 CREATE USER visitor WITH PASSWORD '123456';
 GRANT SELECT ON spot_klines_1d TO visitor;
 GRANT SELECT ON request_logs TO visitor;
 GRANT INSERT ON request_logs TO visitor;
+GRANT SELECT ON spot_symbols_info TO visitor;

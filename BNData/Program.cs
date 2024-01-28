@@ -30,11 +30,12 @@ namespace BNData
                 .WriteTo.Console(Serilog.Events.LogEventLevel.Error)
                 .CreateLogger();
 
-            Parser.Default.ParseArguments<InitOptions, DownloadOptions, UploadOptions>(args)
+            Parser.Default.ParseArguments<InitOptions, DownloadOptions, UploadOptions, SymbolOptions>(args)
                 .MapResult(
                     (InitOptions opts) => opts.Run(),
                     (DownloadOptions opts) => opts.Run(),
                     (UploadOptions opts) => opts.Run(),
+                    (SymbolOptions opts) => opts.Run(),
                     errs => 1
                 );
         }

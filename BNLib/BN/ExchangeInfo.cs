@@ -3,16 +3,13 @@ using Binance.Net.Enums;
 using Binance.Net.Objects.Models.Spot;
 using BNLib.Enums;
 using BNLib.Frame;
-using System.Runtime.Caching;
 
 namespace BNLib.BN
 {
     public class ExchangeInfo
     {
         private static BinanceExchangeInfo[] _cache = new BinanceExchangeInfo[3];
-        private static ObjectCache _symbolSpotCache = MemoryCache.Default;
         private static AsyncLock _spotLock = new AsyncLock();
-        private static CacheItemPolicy _cachePolicy = new CacheItemPolicy { AbsoluteExpiration = DateTime.Today.AddDays(1) };
 
         public static async Task<BinanceExchangeInfo?> GetExchangeInfo(MarketType type)
         {
@@ -66,16 +63,12 @@ namespace BNLib.BN
 
         public static async Task<BinanceSymbol?> GetSpotSymbols(string symbol)
         {
-            if (_symbolSpotCache.Contains(symbol))
-                return (BinanceSymbol)_symbolSpotCache.Get(symbol);
-
             var info = await GetExchangeInfo(MarketType.SPOT);
             if (info == null)
                 return null;
             var s = info.Symbols.FirstOrDefault(s => s.Name == symbol);
             if (s == null)
                 return new BinanceSymbol();
-            _symbolSpotCache.Add(symbol, s, _cachePolicy);
             return s;
         }
     }

@@ -248,7 +248,17 @@ namespace BNLib.Frame
         // 数据校准，自动补齐缺失的K线
         public async Task FixDailyKlines(PgDB db, MarketType market, string symbol, DateTime tbegDate, DateTime tendDate)
         {
-            var dblines = await db.QueryKlinesAsync(symbol, tbegDate, tendDate);
+            List<BinanceSpotKline> dblines;
+            try
+            {
+                dblines = await db.QueryKlinesAsync(symbol, tbegDate, tendDate);
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex, $"FixDailyKlines {symbol}");
+                return;
+            }
+
             var lines = new List<BinanceSpotKline>();
             var begDate = tbegDate;
             // 去掉开始日期前的数据

@@ -115,34 +115,39 @@ namespace BNAPI.Controllers
         {
             var columns = GetSQLColumns(dhParams.indis, dhParams.tbeg, dhParams.tend, dhParams.ext);
 
-            int cells = 0;
-            var dict = new List<KeyValuePair<string, ListTable>>(dhParams.symbols.Length);
-            foreach (var s in dhParams.symbols)
+            try
             {
-                var ds = await GetDHOne(s, columns, dhParams.tbeg, dhParams.tend);
-                cells += ds[0].Value.Count;
-                dict.Add(new KeyValuePair<string, ListTable>(s, ds));
+                int cells = 0;
+                var dict = new List<KeyValuePair<string, ListTable>>(dhParams.symbols.Length);
+                foreach (var s in dhParams.symbols)
+                {
+                    var ds = await GetDHOne(s, columns, dhParams.tbeg, dhParams.tend);
+                    cells += ds[0].Value.Count;
+                    dict.Add(new KeyValuePair<string, ListTable>(s, ds));
+                }
+                _logger.LogInformation($"GetDS cells {cells}");
+
+                var result = new Dictionary<string, object>();
+                result["data"] = dict;
+                result["status"] = new RequestStatus { err_code = 0, err_msg = "OK" };
+
+                await RecordLog(dhParams, cells);
+                return result;
             }
-            _logger.LogInformation($"GetDS cells {cells}");
-
-            var result = new Dictionary<string, object>();
-            result["data"] = dict;
-            result["status"] = new RequestStatus { err_code = 0, err_msg = "OK" };
-
-            await RecordLog(dhParams, cells);
-            return result;
+            catch (Exception e)
+            {
+                _logger.LogError(e.Message);
+                var result = new Dictionary<string, object>();
+                result["data"] = null;
+                result["status"] = new RequestStatus { err_code = 1, err_msg = e.Message };
+                return result;
+            }
         }
 
         private async Task<ListTable> GetDHOne(string symbol, string columns, DateTime tbeg, DateTime tend)
         {
-            string strBegin = tbeg.ToString("yyyy-MM-dd");
-            string strEnd = tend.ToString("yyyy-MM-dd");
-            var sql = $"SELECT {columns} FROM spot_klines_1d " +
-                $"WHERE symbol='{symbol}' AND" +
-                $"      open_time >= '{strBegin}' and open_time <= '{strEnd}'" +
-                $"ORDER BY open_time ASC;";
             var db = GetDB();
-            var table = await db.QueryDataAsync(sql);
+            var table = await db.QueryDataHistory(symbol, columns, tbeg, tend);
             return Convert(table);
         }
 
@@ -211,10 +216,7 @@ namespace BNAPI.Controllers
             var strParam = symbols + " " + indis;
 
             var db = GetDB();
-            var sql = $"INSERT INTO request_logs (ip, sql, cells, err) " +
-                $"VALUES ('{RemoteIP()}', '{strParam}', " +
-                $"'{cells}', '');";
-            await db.ExecuteSQLAsync(sql);
+            await db.RecordLog(RemoteIP(), strParam, cells, "");
         }
     }
 }

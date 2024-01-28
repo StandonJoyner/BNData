@@ -5,12 +5,7 @@ using BNLib.Enums;
 using BNLib.Frame;
 using CommandLine;
 using Serilog;
-using System;
-using System.Collections.Generic;
 using System.Configuration;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace BNData.Options
 {

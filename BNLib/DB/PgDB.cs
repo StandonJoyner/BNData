@@ -13,6 +13,8 @@ using Npgsql.Bulk;
 using Microsoft.EntityFrameworkCore;
 using CryptoExchange.Net.CommonObjects;
 using Serilog;
+using static System.Net.Mime.MediaTypeNames;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace BNLib.DB
 {
@@ -57,86 +59,64 @@ namespace BNLib.DB
                 $"CommandTimeout=300";
         }
 
-        public async Task<DataTable> QueryDataAsync(string sql)
+        public async Task<DataTable> QueryDataHistory(string symbol, string columns, DateTime tbeg, DateTime tend)
         {
             using (var conn = new NpgsqlConnection(_connString))
             {
                 await conn.OpenAsync();
-                using (var cmd = new NpgsqlCommand(sql, conn))
-                {
-                    using (var reader = await cmd.ExecuteReaderAsync())
-                    {
-                        var dataTable = new DataTable();
-                        dataTable.Load(reader);
-                        return dataTable;
-                    }
-                }
-            }
-        }
 
-        public async Task<bool> ExecuteSQLAsync(string sql)
-        {
-            try
-            {
-                using (var conn = new NpgsqlConnection(_connString))
-                {
-                    await conn.OpenAsync();
-                    using (var cmd = new NpgsqlCommand(sql, conn))
-                    {
-                        await cmd.ExecuteNonQueryAsync();
-                    }
-                }
-                return true;
-            }
-            catch (Exception ex)
-            {
-                _logger.Error(ex, $"ExecuteSQLAsync {sql}");
-                return false;
+                var cmd = new NpgsqlCommand("SELECT " + columns + " FROM spot_klines_1d " +
+                    "WHERE symbol=@symbol AND open_time >= @tbeg AND open_time <= @tend " +
+                                           "ORDER BY open_time ASC;", conn);
+                cmd.Parameters.AddWithValue("symbol", symbol);
+                cmd.Parameters.AddWithValue("tbeg", tbeg);
+                cmd.Parameters.AddWithValue("tend", tend);
+                cmd.ExecuteNonQuery();
+
+                var reader = await cmd.ExecuteReaderAsync();
+                DataTable dt = new DataTable();
+                dt.Load(reader);
+                return dt;
             }
         }
 
         public async Task<List<BinanceSpotKline>> QueryKlinesAsync(string symbol, DateTime beg, DateTime end)
         {
-            string begStr = beg.ToString("yyyy-MM-dd");
-            string endStr = end.ToString("yyyy-MM-dd");
-            var sql = $"SELECT * from spot_klines_1d " +
-                $"WHERE symbol = '{symbol}' AND open_time >= '{begStr}' AND open_time <= '{endStr}'" +
-                $"ORDER BY open_time ASC;";
-            var dataTable = await QueryDataAsync(sql);
-            var lines = new List<BinanceSpotKline>();
-            foreach (DataRow row in dataTable.Rows)
+            using (var conn = new NpgsqlConnection(_connString))
             {
-                var line = new BinanceSpotKline();
-                line.OpenTime = row.Field<DateTime>("open_time");
-                line.OpenPrice = row.Field<decimal>("open");
-                line.HighPrice = row.Field<decimal>("high");
-                line.LowPrice = row.Field<decimal>("low");
-                line.ClosePrice = row.Field<decimal>("close");
-                line.Volume = row.Field<decimal>("volume");
-                line.CloseTime = row.Field<DateTime>("close_time");
-                line.QuoteVolume = row.Field<decimal>("quote_volume");
-                line.TradeCount = row.Field<int>("trade_count");
-                line.TakerBuyBaseVolume = row.Field<decimal>("buy_volume");
-                line.TakerBuyQuoteVolume = row.Field<decimal>("buy_quote_volume");
-                lines.Add(line);
-            }
-            return lines;
-        }
+                await conn.OpenAsync();
 
-        class spot_klines_1d
-        {
-            public string symbol { get; set; }
-            public DateTime date { get; set; }
-            public decimal open { get; set; }
-            public decimal high { get; set; }
-            public decimal low { get; set; }
-            public decimal close { get; set; }
-            public decimal volume { get; set; }
-            public DateTime close_time { get; set; }
-            public decimal quote_volume { get; set; }
-            public int trade_count { get; set; }
-            public decimal buy_volume { get; set; }
-            public decimal buy_quote_volume { get; set; }
+                var cmd = new NpgsqlCommand("SELECT * FROM spot_klines_1d " +
+                                           "WHERE symbol=@symbol AND open_time >= @tbeg AND open_time <= @tend " +
+                                                                                         "ORDER BY open_time ASC;", conn);
+                cmd.Parameters.AddWithValue("symbol", symbol);
+                cmd.Parameters.AddWithValue("tbeg", beg);
+                cmd.Parameters.AddWithValue("tend", end);
+                cmd.ExecuteNonQuery();
+
+                var reader = await cmd.ExecuteReaderAsync();
+                DataTable dt = new DataTable();
+                dt.Load(reader);
+
+                var lines = new List<BinanceSpotKline>();
+                foreach (DataRow row in dt.Rows)
+                {
+                    var line = new BinanceSpotKline();
+                    line.OpenTime = row.Field<DateTime>("open_time");
+                    line.OpenPrice = row.Field<decimal>("open");
+                    line.HighPrice = row.Field<decimal>("high");
+                    line.LowPrice = row.Field<decimal>("low");
+                    line.ClosePrice = row.Field<decimal>("close");
+                    line.Volume = row.Field<decimal>("volume");
+                    line.CloseTime = row.Field<DateTime>("close_time");
+                    line.QuoteVolume = row.Field<decimal>("quote_volume");
+                    line.TradeCount = row.Field<int>("trade_count");
+                    line.TakerBuyBaseVolume = row.Field<decimal>("buy_volume");
+                    line.TakerBuyQuoteVolume = row.Field<decimal>("buy_quote_volume");
+                    lines.Add(line);
+                }
+                return lines;
+            }
         }
 
         public async Task<bool> InsertSpotTable(string symbol, List<BinanceSpotKline> data)
@@ -180,25 +160,6 @@ namespace BNLib.DB
             }
         }
 
-        // 空数据插入
-        public async Task InsertSpotTableNullData(string symbol, List<BinanceSpotKline> data)
-        {
-            using (var conn = new NpgsqlConnection(_connString))
-            {
-                await conn.OpenAsync();
-                foreach (var kline in data)
-                {
-                    var cmd = new NpgsqlCommand("INSERT INTO spot_klines_1d" +
-                        "       (symbol, open_time)" +
-                        "VALUES(@symbol, @open_time)"
-                        );
-                    cmd.Parameters.AddWithValue("symbol", symbol);
-                    cmd.Parameters.AddWithValue("open_time", kline.OpenTime);
-                    await cmd.ExecuteNonQueryAsync();
-                }
-            }
-        }
-
         public async Task<(DateTime, DateTime)> GetSymbolCurDateRange(MarketType marketType, string sym)
         {
             using (var conn = new NpgsqlConnection(_connString))
@@ -220,6 +181,96 @@ namespace BNLib.DB
                 DateTime.SpecifyKind(begDate, DateTimeKind.Utc);
                 DateTime.SpecifyKind(endDate, DateTimeKind.Utc);
                 return (begDate, endDate);
+            }
+        }
+
+        public async Task UpdateSymbolInfo(BinanceSymbol symbol)
+        {
+            try
+            {
+                using (var conn = new NpgsqlConnection(_connString))
+                {
+                    await conn.OpenAsync();
+
+                    var cmd = new NpgsqlCommand(@"
+                INSERT INTO spot_symbols_info(
+                    symbol, quote_asset, base_asset, 
+                    quote_asset_precision, base_asset_precision, 
+                    quote_fee_precision, base_fee_precision,
+                    iceberg_allowed, oco_allowed, 
+                    quote_order_qty_market_allowed, 
+                    is_spot_trading_allowed, is_margin_trading_allowed, 
+                    created_at, updated_at)
+                VALUES (
+                    @symbol, @quote_asset, @base_asset, 
+                    @quote_asset_precision, @base_asset_precision, 
+                    @quote_fee_precision, @base_fee_precision,
+                    @iceberg_allowed, @oco_allowed, 
+                    @quote_order_qty_market_allowed, 
+                    @is_spot_trading_allowed, @is_margin_trading_allowed, 
+                    @created_at, @updated_at)
+                ON CONFLICT (symbol) DO UPDATE SET
+                    quote_asset = EXCLUDED.quote_asset,
+                    base_asset = EXCLUDED.base_asset,
+                    quote_asset_precision = EXCLUDED.quote_asset_precision,
+                    base_asset_precision = EXCLUDED.base_asset_precision,
+                    quote_fee_precision = EXCLUDED.quote_fee_precision,
+                    base_fee_precision = EXCLUDED.base_fee_precision,
+                    iceberg_allowed = EXCLUDED.iceberg_allowed,
+                    oco_allowed = EXCLUDED.oco_allowed,
+                    quote_order_qty_market_allowed = EXCLUDED.quote_order_qty_market_allowed,
+                    is_spot_trading_allowed = EXCLUDED.is_spot_trading_allowed,
+                    is_margin_trading_allowed = EXCLUDED.is_margin_trading_allowed,
+                    updated_at = EXCLUDED.updated_at
+                ", conn);
+
+                    string pair = symbol.BaseAsset + "/" + symbol.QuoteAsset;
+                    // 添加参数
+                    cmd.Parameters.AddWithValue("symbol", pair);
+                    cmd.Parameters.AddWithValue("quote_asset", symbol.QuoteAsset);
+                    cmd.Parameters.AddWithValue("base_asset", symbol.BaseAsset);
+                    cmd.Parameters.AddWithValue("quote_asset_precision", symbol.QuoteAssetPrecision);
+                    cmd.Parameters.AddWithValue("base_asset_precision", symbol.BaseAssetPrecision);
+                    cmd.Parameters.AddWithValue("quote_fee_precision", symbol.QuoteFeePrecision);
+                    cmd.Parameters.AddWithValue("base_fee_precision", symbol.BaseFeePrecision);
+
+                    cmd.Parameters.AddWithValue("iceberg_allowed", symbol.IceBergAllowed);
+                    cmd.Parameters.AddWithValue("oco_allowed", symbol.OCOAllowed);
+                    cmd.Parameters.AddWithValue("quote_order_qty_market_allowed", symbol.QuoteOrderQuantityMarketAllowed);
+                    cmd.Parameters.AddWithValue("is_spot_trading_allowed", symbol.IsSpotTradingAllowed);
+                    cmd.Parameters.AddWithValue("is_margin_trading_allowed", symbol.IsMarginTradingAllowed);
+                    cmd.Parameters.AddWithValue("created_at", DateTime.UtcNow);
+                    cmd.Parameters.AddWithValue("updated_at", DateTime.UtcNow);
+
+                    await cmd.ExecuteNonQueryAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex, $"UpdateSymbolInfo {symbol.Name}");
+            }
+        }
+
+        public async Task RecordLog(string ip, string content, int cells, string err)
+        {
+            try
+            {
+                using (var conn = new NpgsqlConnection(_connString))
+                {
+                    await conn.OpenAsync();
+
+                    var cmd = new NpgsqlCommand("INSERT INTO request_logs (ip, sql, cells, err) " +
+                        "VALUES (@ip, @sql, @cells, @err);", conn);
+                    cmd.Parameters.AddWithValue("ip", ip);
+                    cmd.Parameters.AddWithValue("sql", content);
+                    cmd.Parameters.AddWithValue("cells", cells);
+                    cmd.Parameters.AddWithValue("err", err);
+                    await cmd.ExecuteNonQueryAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex, $"RecordLog {ip} {content} {cells} {err}");
             }
         }
     }
